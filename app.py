@@ -61,7 +61,7 @@ def write_script():
     
     try:
         print(f"🧠 正在呼叫 Gemini 拆解分鏡：{title}")
-        model = genai.GenerativeModel('gemini-1.5-pro')
+        model = genai.GenerativeModel('gemini-3.1-pro-preview')
         response = model.generate_content(prompt_text)
         
         # 清理可能夾帶的 Markdown 語法 (```json ... ```)
