@@ -77,7 +77,7 @@ def process_video_background(scene_data):
         print(f"✅ 渲染完成！準備將 {output_filename} 送回 Google Drive...")
         
         # 您的 GAS Webhook 網址 (請確認這裡有填對)
-        GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxSeZh5ad2KC6hkqm1R7sSN6MElQ6GCDsc7MCI36pGMGz1na0TcQwf8H5rL8wGG8-3t/exec" 
+        GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzxxDJqDigH-9NK8XUUeOiX0NDkBRGaGIc4Z_m-2Q5bzPZT2aEh0zvI-MIkSQoUf90y/exec" 
         
         with open(output_filename, "rb") as video_file:
             encoded_string = base64.b64encode(video_file.read()).decode('utf-8')
