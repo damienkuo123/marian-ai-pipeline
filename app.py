@@ -21,14 +21,24 @@ def process_video_background(scene_data):
         # 1. 生圖
         print("-> 🎨 正在渲染完美靜態圖...")
         img_payload = {"prompt": scene_data['prompt'], "image_size": "landscape_16_9", "loras": [{"path": LORA_URL, "scale": 1.0}]}
-        img_resp = requests.post("https://fal.run/fal-ai/flux-lora", json=img_payload, headers=headers).json()
-        img_url = img_resp['images'][0]['url']
+        img_resp = requests.post("https://fal.run/fal-ai/flux-lora", json=img_payload, headers=headers)
+        
+        # 🛡️ 防彈攔截：如果 Fal.ai 拒絕生圖
+        if img_resp.status_code != 200:
+            raise Exception(f"Fal.ai 生圖失敗！原因：{img_resp.text}")
+            
+        img_url = img_resp.json()['images'][0]['url']
 
         # 2. 影片
         print("-> 🎥 正在將圖片轉為 3D 動畫...")
         vid_payload = {"image_url": img_url, "prompt": scene_data['video_prompt']}
-        vid_resp = requests.post("https://fal.run/fal-ai/minimax-video/image-to-video", json=vid_payload, headers=headers).json()
-        video_url = vid_resp['video']['url']
+        vid_resp = requests.post("https://fal.run/fal-ai/minimax-video/image-to-video", json=vid_payload, headers=headers)
+        
+        # 🛡️ 防彈攔截：如果 Fal.ai 拒絕生影片
+        if vid_resp.status_code != 200:
+            raise Exception(f"Fal.ai 動畫失敗！原因：{vid_resp.text}")
+            
+        video_url = vid_resp.json()['video']['url']
         
         video_filename = f"raw_video_{scene_data['scene_id']}.mp4"
         with open(video_filename, 'wb') as f:
@@ -52,7 +62,7 @@ def process_video_background(scene_data):
         # --- 物流快遞回 GAS ---
         print(f"✅ 渲染完成！準備將 {output_filename} 送回 Google Drive...")
         
-        # 您的 GAS Webhook 網址
+        # 您的 GAS Webhook 網址 (請確認這裡有填對)
         GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzR6LE_6wzzdoaKHM80sd01xah6PuGu740UzsDOnRy9kqZhi_GX_qC2CJG6_5Lf8esB/exec" 
         
         with open(output_filename, "rb") as video_file:
@@ -66,7 +76,7 @@ def process_video_background(scene_data):
         deliver_resp = requests.post(GAS_WEBHOOK_URL, json=payload)
         print(f"📦 物流回報: {deliver_resp.text}")
 
-        # 5. 🏠 清理環境：刪除暫存檔，保持伺服器整潔
+        # 5. 🏠 清理環境
         audio_clip.close()
         raw_video_clip.close()
         os.remove(audio_filename)
