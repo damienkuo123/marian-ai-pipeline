@@ -175,5 +175,21 @@ def start_animation():
     threading.Thread(target=process_video_background, args=(data['scene_id'], data['confirmed_image'])).start()
     return jsonify({"status": "success"})
 
+# ==========================================
+# 🔍 系統雷達：列出所有可用的 Gemini 模型
+# ==========================================
+@app.route('/api/models', methods=['GET'])
+def list_available_models():
+    try:
+        # 列出所有支援生成內容的模型
+        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        return jsonify({
+            "status": "success", 
+            "total_count": len(available_models),
+            "available_models": available_models
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
