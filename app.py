@@ -73,22 +73,35 @@ def process_video_background(scene_data):
         # 執行指令
         subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-        # --- 物流快遞回 GAS ---
-        print(f"✅ 渲染完成！準備將 {output_filename} 送回 Google Drive...")
+        # --- 全新升級：GoFile 雲端直通車 ---
+        print(f"✅ 渲染完成！準備將影片上傳至 GoFile 雲端空間...")
         
-        # 您的 GAS Webhook 網址 (請確認這裡有填對)
-        GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzxxDJqDigH-9NK8XUUeOiX0NDkBRGaGIc4Z_m-2Q5bzPZT2aEh0zvI-MIkSQoUf90y/exec" 
-        
-        with open(output_filename, "rb") as video_file:
-            encoded_string = base64.b64encode(video_file.read()).decode('utf-8')
+        try:
+            # 1. 向 GoFile 申請一個伺服器節點
+            server_req = requests.get("https://api.gofile.io/servers")
+            server_name = server_req.json()['data']['servers'][0]['name']
             
-        payload = {
-            "filename": output_filename,
-            "video_base64": encoded_string
-        }
-        
-        deliver_resp = requests.post(GAS_WEBHOOK_URL, json=payload)
-        print(f"📦 物流回報: {deliver_resp.text}")
+            # 2. 上傳影片
+            upload_url = f"https://{server_name}.gofile.io/contents/uploadfile"
+            with open(output_filename, 'rb') as f:
+                upload_resp = requests.post(upload_url, files={'file': f})
+            
+            # 3. 取得雲端下載網址
+            download_link = upload_resp.json()['data']['downloadPage']
+            print(f"☁️ 影片已成功上傳雲端！下載連結：{download_link}")
+            
+            # 4. 把「短網址」寄回您的 GAS (這絕對不會被擋！)
+            GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzxxDJqDigH-9NK8XUUeOiX0NDkBRGaGIc4Z_m-2Q5bzPZT2aEh0zvI-MIkSQoUf90y/exec" 
+            
+            payload = {
+                "filename": output_filename,
+                "video_url": download_link  # 這次我們只傳網址，不傳笨重的檔案
+            }
+            requests.post(GAS_WEBHOOK_URL, json=payload)
+            print("📦 網址已成功回報給 GAS 中心！")
+            
+        except Exception as upload_err:
+            print(f"❌ 上傳雲端失敗：{upload_err}")
 
         # 5. 🏠 清理環境
         os.remove(audio_filename)
