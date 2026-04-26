@@ -2,6 +2,7 @@
 import os
 import requests
 import threading
+import base64  # 🌟 補上這個必要的導入
 from flask import Flask, request, jsonify
 from gtts import gTTS
 from moviepy.editor import VideoFileClip, AudioFileClip
@@ -9,11 +10,9 @@ from moviepy.editor import VideoFileClip, AudioFileClip
 app = Flask(__name__)
 
 # 🚨 填入您的金鑰 🚨
-FAL_API_KEY = "YOUR_NEW_FAL_API_KEY"
+FAL_API_KEY = "588b10cb-603e-494e-96b3-66aed77ae983:b13610c75dcccb2c674df50248152692"
 LORA_URL = "https://v3b.fal.media/files/b/0a97b6f3/HhMceWpJdTP7Fkz6_LHLk_pytorch_lora_weights.safetensors"
-# LINE_NOTIFY_TOKEN = "我們下一步再來申請這個"
 
-# 這是真正在背景做苦力的函數 (把您 Colab 的心血搬過來)
 def process_video_background(scene_data):
     try:
         print(f"🚀 背景任務啟動：處理場景 {scene_data['scene_id']}")
@@ -31,7 +30,6 @@ def process_video_background(scene_data):
         vid_resp = requests.post("https://fal.run/fal-ai/minimax-video/image-to-video", json=vid_payload, headers=headers).json()
         video_url = vid_resp['video']['url']
         
-        # 下載影片
         video_filename = f"raw_video_{scene_data['scene_id']}.mp4"
         with open(video_filename, 'wb') as f:
             f.write(requests.get(video_url).content)
@@ -51,28 +49,41 @@ def process_video_background(scene_data):
         output_filename = f"final_scene_{scene_data['scene_id']}.mp4"
         final_video_clip.write_videofile(output_filename, fps=24, logger=None)
         
-        print(f"✅ 動畫渲染完成！檔案：{output_filename}")
+        # --- 物流快遞回 GAS ---
+        print(f"✅ 渲染完成！準備將 {output_filename} 送回 Google Drive...")
         
-        # ⚠️ 未來這裡會加入「將 MP4 上傳 Google Drive」與「發送 LINE 通知」的程式碼 ⚠️
+        # 您的 GAS Webhook 網址
+        GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzR6LE_6wzzdoaKHM80sd01xah6PuGu740UzsDOnRy9kqZhi_GX_qC2CJG6_5Lf8esB/exec" 
+        
+        with open(output_filename, "rb") as video_file:
+            encoded_string = base64.b64encode(video_file.read()).decode('utf-8')
+            
+        payload = {
+            "filename": output_filename,
+            "video_base64": encoded_string
+        }
+        
+        deliver_resp = requests.post(GAS_WEBHOOK_URL, json=payload)
+        print(f"📦 物流回報: {deliver_resp.text}")
 
+        # 5. 🏠 清理環境：刪除暫存檔，保持伺服器整潔
+        audio_clip.close()
+        raw_video_clip.close()
+        os.remove(audio_filename)
+        os.remove(video_filename)
+        os.remove(output_filename)
+        print("🧹 暫存檔已清理。")
+        
     except Exception as e:
-        print(f"❌ 背景任務發生錯誤：{e}")
+        print(f"❌ 錯誤報告：{e}")
 
-
-# 這是伺服器的「大門」，專門接收 GAS 傳來的 JSON
 @app.route('/api/generate', methods=['POST'])
 def receive_script():
-    data = request.json # 接收 GAS 傳來的 JSON 陣列
-    scene_data = data[0] # 取出第一個場景
-    
-    # 把任務丟給背景去跑，不要讓網頁卡住
+    data = request.json
+    scene_data = data[0]
     thread = threading.Thread(target=process_video_background, args=(scene_data,))
     thread.start()
-    
-    # 立刻回覆 GAS 網頁：「收到了，正在處理！」
-    return jsonify({"status": "success", "message": "任務已成功接收，正在背景處理中！"})
-
+    return jsonify({"status": "success", "message": "任務已排入排程！"})
 
 if __name__ == '__main__':
-    # 啟動伺服器 (Port 5000)
     app.run(host='0.0.0.0', port=5000)
