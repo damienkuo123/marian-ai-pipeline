@@ -3,3 +3,4 @@ requests
 gTTS
 imageio-ffmpeg
 gunicorn
+google-generativeai
