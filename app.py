@@ -5,7 +5,8 @@ import threading
 import base64  # 🌟 補上這個必要的導入
 from flask import Flask, request, jsonify
 from gtts import gTTS
-from moviepy.editor import VideoFileClip, AudioFileClip
+import subprocess
+import imageio_ffmpeg
 
 app = Flask(__name__)
 
@@ -49,16 +50,29 @@ def process_video_background(scene_data):
         audio_filename = f"scene_{scene_data['scene_id']}.mp3"
         gTTS(text=scene_data['dialogue'], lang='en', slow=False).save(audio_filename)
 
-        # 4. 剪輯
-        print("-> 🎞️ 正在進行最終剪輯...")
-        audio_clip = AudioFileClip(audio_filename)
-        raw_video_clip = VideoFileClip(video_filename)
-        final_duration = min(audio_clip.duration, raw_video_clip.duration)
-        final_video_clip = raw_video_clip.subclip(0, final_duration).set_audio(audio_clip.subclip(0, final_duration))
-        
+        # 4. 剪輯 (終極低記憶體 FFmpeg 模式)
+        print("-> 🎞️ 正在進行最終剪輯 (極速模式)...")
         output_filename = f"final_scene_{scene_data['scene_id']}.mp4"
-        final_video_clip.write_videofile(output_filename, fps=24, logger=None)
         
+        # 取得底層影像引擎的位置
+        ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+        
+        # 組裝神級指令：不重新運算影像，直接把聲音合併進去 (極度省 RAM)
+        command = [
+            ffmpeg_exe, "-y",
+            "-i", video_filename,   # 影片輸入
+            "-i", audio_filename,   # 聲音輸入
+            "-c:v", "copy",         # 影像軌直接複製 (這就是省記憶體的關鍵！)
+            "-c:a", "aac",          # 音軌轉碼為相容格式
+            "-map", "0:v:0",        # 強制取用第一個檔案的影像
+            "-map", "1:a:0",        # 強制取用第二個檔案的聲音
+            "-shortest",            # 以較短的檔案為主來裁切
+            output_filename
+        ]
+        
+        # 執行指令
+        subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
         # --- 物流快遞回 GAS ---
         print(f"✅ 渲染完成！準備將 {output_filename} 送回 Google Drive...")
         
@@ -77,8 +91,6 @@ def process_video_background(scene_data):
         print(f"📦 物流回報: {deliver_resp.text}")
 
         # 5. 🏠 清理環境
-        audio_clip.close()
-        raw_video_clip.close()
         os.remove(audio_filename)
         os.remove(video_filename)
         os.remove(output_filename)
