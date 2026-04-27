@@ -68,7 +68,7 @@ def write_script():
     
     try:
         model = genai.GenerativeModel('gemini-3.1-pro-preview')
-        response = model.generate_content(prompt_text)
+        response = model.generate_content(prompt_text, safety_settings=SAFETY_SETTINGS)
         
         # 強化版 JSON 清理邏輯
         result_text = response.text.strip()
@@ -202,7 +202,7 @@ def brainstorm():
         if not history:
             user_message = f"[系統指令：你是瑪麗安動畫工作室的首席編劇。請以專業、有創意的態度與導演討論營隊動畫劇本。協助發想章節大綱，語氣保持專業與簡潔。]\n\n導演說：{user_message}"
 
-        chat = model.start_chat(history=history)
+        chat = model.start_chat(history=history, safety_settings=SAFETY_SETTINGS)
         response = chat.send_message(user_message)
         updated_history = [{"role": msg.role, "parts": [msg.parts[0].text]} for msg in chat.history]
         return jsonify({"status": "success", "reply": response.text, "history": updated_history})
@@ -238,7 +238,7 @@ def analyze_assets():
     
     try:
         model = genai.GenerativeModel('gemini-3.1-pro-preview')
-        response = model.generate_content(prompt_text)
+        response = model.generate_content(prompt_text, safety_settings=SAFETY_SETTINGS)
         
         # 修正：補齊 JSON 清理邏輯，避免解析失敗
         result_text = response.text.strip()
