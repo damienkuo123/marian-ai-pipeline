@@ -17,9 +17,9 @@ FAL_API_KEY = os.environ.get("FAL_API_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 genai.configure(api_key=GEMINI_API_KEY)
-LORA_URL = "[https://v3b.fal.media/files/b/0a97b6f3/HhMceWpJdTP7Fkz6_LHLk_pytorch_lora_weights.safetensors](https://v3b.fal.media/files/b/0a97b6f3/HhMceWpJdTP7Fkz6_LHLk_pytorch_lora_weights.safetensors)"
+LORA_URL = "https://v3b.fal.media/files/b/0a97b6f3/HhMceWpJdTP7Fkz6_LHLk_pytorch_lora_weights.safetensors"
 # 修正：移除行末隱藏字元
-GAS_WEBHOOK_URL = "[https://script.google.com/macros/s/AKfycbzxxDJqDigH-9NK8XUUeOiX0NDkBRGaGIc4Z_m-2Q5bzPZT2aEh0zvI-MIkSQoUf90y/exec](https://script.google.com/macros/s/AKfycbzxxDJqDigH-9NK8XUUeOiX0NDkBRGaGIc4Z_m-2Q5bzPZT2aEh0zvI-MIkSQoUf90y/exec)" 
+GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzxxDJqDigH-9NK8XUUeOiX0NDkBRGaGIc4Z_m-2Q5bzPZT2aEh0zvI-MIkSQoUf90y/exec" 
 
 PENDING_SCENES = {}
 
@@ -94,7 +94,7 @@ def process_images_background(scene_data):
             "num_images": 4, 
             "loras": [{"path": LORA_URL, "scale": 1.0}]
         }
-        img_resp = requests.post("[https://fal.run/fal-ai/flux-lora](https://fal.run/fal-ai/flux-lora)", json=img_payload, headers=headers)
+        img_resp = requests.post("https://fal.run/fal-ai/flux-lora", json=img_payload, headers=headers)
         if img_resp.status_code != 200: raise Exception(img_resp.text)
             
         img_urls = [img['url'] for img in img_resp.json()['images']]
@@ -119,7 +119,7 @@ def process_video_background(scene_id, confirmed_image):
 
         print("-> 🎥 生成 3D 動畫...")
         vid_payload = {"image_url": confirmed_image, "prompt": scene_data.get('video_prompt', 'natural motion')}
-        vid_resp = requests.post("[https://fal.run/fal-ai/minimax-video/image-to-video](https://fal.run/fal-ai/minimax-video/image-to-video)", json=vid_payload, headers=headers)
+        vid_resp = requests.post("https://fal.run/fal-ai/minimax-video/image-to-video", json=vid_payload, headers=headers)
         if vid_resp.status_code != 200: raise Exception(vid_resp.text)
             
         video_filename = f"raw_video_{scene_id}.mp4"
@@ -141,7 +141,7 @@ def process_video_background(scene_id, confirmed_image):
         ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         print(f"✅ 上傳 GoFile...")
-        server_name = requests.get("[https://api.gofile.io/servers](https://api.gofile.io/servers)").json()['data']['servers'][0]['name']
+        server_name = requests.get("https://api.gofile.io/servers").json()['data']['servers'][0]['name']
         with open(output_filename, 'rb') as f:
             download_link = requests.post(f"https://{server_name}.gofile.io/contents/uploadfile", files={'file': f}).json()['data']['downloadPage']
         
