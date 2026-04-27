@@ -17,8 +17,9 @@ FAL_API_KEY = os.environ.get("FAL_API_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 genai.configure(api_key=GEMINI_API_KEY)
-LORA_URL = "https://v3b.fal.media/files/b/0a97b6f3/HhMceWpJdTP7Fkz6_LHLk_pytorch_lora_weights.safetensors"
-GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzxxDJqDigH-9NK8XUUeOiX0NDkBRGaGIc4Z_m-2Q5bzPZT2aEh0zvI-MIkSQoUf90y/exec" 
+LORA_URL = "[https://v3b.fal.media/files/b/0a97b6f3/HhMceWpJdTP7Fkz6_LHLk_pytorch_lora_weights.safetensors](https://v3b.fal.media/files/b/0a97b6f3/HhMceWpJdTP7Fkz6_LHLk_pytorch_lora_weights.safetensors)"
+# 修正：移除行末隱藏字元
+GAS_WEBHOOK_URL = "[https://script.google.com/macros/s/AKfycbzxxDJqDigH-9NK8XUUeOiX0NDkBRGaGIc4Z_m-2Q5bzPZT2aEh0zvI-MIkSQoUf90y/exec](https://script.google.com/macros/s/AKfycbzxxDJqDigH-9NK8XUUeOiX0NDkBRGaGIc4Z_m-2Q5bzPZT2aEh0zvI-MIkSQoUf90y/exec)" 
 
 PENDING_SCENES = {}
 
@@ -33,11 +34,9 @@ def write_script():
     chars = data.get('chars', [])
     locs = data.get('locs', [])
 
-    # 將 GAS 傳來的角色與場景資產，組合成給 AI 的參考書
     char_info = "\n".join([f"角色 [{c['Name']}]: {c['Prompt']}" for c in chars])
     loc_info = "\n".join([f"場景 [{l['Name']}]: {l['Prompt']}" for l in locs])
 
-    # 嚴格的系統提示詞 (System Prompt) - 這是確保產出品質的靈魂
     prompt_text = f"""
     You are an expert 3D animation director and storyboard artist.
     Please break down the following Sequence Outline into 3 to 5 cinematic Shots.
@@ -63,28 +62,28 @@ def write_script():
         model = genai.GenerativeModel('gemini-3.1-pro-preview')
         response = model.generate_content(prompt_text)
         
-        # 完整清理 JSON 格式 (避免 Markdown 標籤干擾)
+        # 強化版 JSON 清理邏輯
         result_text = response.text.strip()
-        if result_text.startswith("```json"):
-            result_text = result_text[7:]
         if result_text.startswith("```"):
-            result_text = result_text[3:]
+            result_text = result_text.split("\n", 1)[-1]
         if result_text.endswith("```"):
-            result_text = result_text[:-3]
+            result_text = result_text.rsplit("\n", 1)[0]
             
-        analysis_data = json.loads(result_text.strip())
-        return jsonify({"status": "success", "analysis": analysis_data})
+        script_json = json.loads(result_text.strip())
+        print(f"✅ Gemini 拆解完成，共 {len(script_json)} 個鏡頭。")
+        
+        return jsonify({"status": "success", "data": script_json})
+        
     except Exception as e:
-        print(f"❌ 資產分析失敗：{e}")
+        print(f"❌ Gemini 編劇失敗：{e}")
         return jsonify({"status": "error", "message": str(e)}), 500
-
 
 # ==========================================
 # 🎬 上半場：批次生圖與選角
 # ==========================================
 def process_images_background(scene_data):
     try:
-        scene_id = scene_data['scene_id']  # 注意：之後會改成 Shot_ID
+        scene_id = scene_data['scene_id']
         print(f"🚀 [上半場] 啟動：為場景 {scene_id} 生成 4 張候選圖...")
         PENDING_SCENES[scene_id] = scene_data
         headers = {"Authorization": f"Key {FAL_API_KEY}", "Content-Type": "application/json"}
@@ -95,7 +94,7 @@ def process_images_background(scene_data):
             "num_images": 4, 
             "loras": [{"path": LORA_URL, "scale": 1.0}]
         }
-        img_resp = requests.post("https://fal.run/fal-ai/flux-lora", json=img_payload, headers=headers)
+        img_resp = requests.post("[https://fal.run/fal-ai/flux-lora](https://fal.run/fal-ai/flux-lora)", json=img_payload, headers=headers)
         if img_resp.status_code != 200: raise Exception(img_resp.text)
             
         img_urls = [img['url'] for img in img_resp.json()['images']]
@@ -120,7 +119,7 @@ def process_video_background(scene_id, confirmed_image):
 
         print("-> 🎥 生成 3D 動畫...")
         vid_payload = {"image_url": confirmed_image, "prompt": scene_data.get('video_prompt', 'natural motion')}
-        vid_resp = requests.post("https://fal.run/fal-ai/minimax-video/image-to-video", json=vid_payload, headers=headers)
+        vid_resp = requests.post("[https://fal.run/fal-ai/minimax-video/image-to-video](https://fal.run/fal-ai/minimax-video/image-to-video)", json=vid_payload, headers=headers)
         if vid_resp.status_code != 200: raise Exception(vid_resp.text)
             
         video_filename = f"raw_video_{scene_id}.mp4"
@@ -132,7 +131,6 @@ def process_video_background(scene_id, confirmed_image):
         if dialogue:
             gTTS(text=dialogue, lang='en', slow=False).save(audio_filename)
         else:
-            # 若無台詞，建立一秒的靜音檔避免報錯
             subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), "-f", "lavfi", "-i", "anullsrc=r=44100:cl=mono", "-t", "1", "-q:a", "9", "-acodec", "libmp3lame", audio_filename, "-y"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         print("-> 🎞️ 極速剪輯...")
@@ -143,7 +141,7 @@ def process_video_background(scene_id, confirmed_image):
         ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         print(f"✅ 上傳 GoFile...")
-        server_name = requests.get("https://api.gofile.io/servers").json()['data']['servers'][0]['name']
+        server_name = requests.get("[https://api.gofile.io/servers](https://api.gofile.io/servers)").json()['data']['servers'][0]['name']
         with open(output_filename, 'rb') as f:
             download_link = requests.post(f"https://{server_name}.gofile.io/contents/uploadfile", files={'file': f}).json()['data']['downloadPage']
         
@@ -173,13 +171,9 @@ def start_animation():
     threading.Thread(target=process_video_background, args=(data['scene_id'], data['confirmed_image'])).start()
     return jsonify({"status": "success"})
 
-# ==========================================
-# 🔍 系統雷達：列出所有可用的 Gemini 模型
-# ==========================================
 @app.route('/api/models', methods=['GET'])
 def list_available_models():
     try:
-        # 列出所有支援生成內容的模型
         available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
         return jsonify({
             "status": "success", 
@@ -189,29 +183,20 @@ def list_available_models():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
 
-# ==========================================
-# ✍️ 全新模組：互動式編劇室 (聊天對話)
-# ==========================================
 @app.route('/api/brainstorm', methods=['POST'])
 def brainstorm():
     data = request.json
     user_message = data.get('message', '')
-    history = data.get('history', []) # 接收過去的對話紀錄
+    history = data.get('history', [])
     
     try:
         model = genai.GenerativeModel('gemini-3.1-pro-preview')
-        
-        # 💡 如果是第一句話，我們偷偷塞入「首席編劇」的系統指令
         if not history:
             user_message = f"[系統指令：你是瑪麗安動畫工作室的首席編劇。請以專業、有創意的態度與導演討論營隊動畫劇本。協助發想章節大綱，語氣保持專業與簡潔。]\n\n導演說：{user_message}"
 
-        # 啟動具有記憶的聊天室
         chat = model.start_chat(history=history)
         response = chat.send_message(user_message)
-        
-        # 整理最新歷史紀錄回傳給網頁
         updated_history = [{"role": msg.role, "parts": [msg.parts[0].text]} for msg in chat.history]
-            
         return jsonify({"status": "success", "reply": response.text, "history": updated_history})
     except Exception as e:
         print(f"❌ 編劇室發生錯誤：{e}")
@@ -227,7 +212,6 @@ def analyze_assets():
     available_chars = data.get('chars', [])
     available_locs = data.get('locs', [])
 
-    # 讓 Gemini 擔任場記，盤點需要哪些資產
     prompt_text = f"""
     You are a production manager. Analyze this chapter outline and match it with the available assets.
     Outline: {outline}
@@ -247,9 +231,17 @@ def analyze_assets():
     try:
         model = genai.GenerativeModel('gemini-3.1-pro-preview')
         response = model.generate_content(prompt_text)
-        # 清理並讀取 JSON (省略清理邏輯...)
-        return jsonify({"status": "success", "analysis": json.loads(response.text)})
+        
+        # 修正：補齊 JSON 清理邏輯，避免解析失敗
+        result_text = response.text.strip()
+        if result_text.startswith("```"):
+            result_text = result_text.split("\n", 1)[-1]
+        if result_text.endswith("```"):
+            result_text = result_text.rsplit("\n", 1)[0]
+            
+        return jsonify({"status": "success", "analysis": json.loads(result_text.strip())})
     except Exception as e:
+        print(f"❌ 資產分析失敗：{e}")
         return jsonify({"status": "error", "message": str(e)}), 500
         
 if __name__ == '__main__':
