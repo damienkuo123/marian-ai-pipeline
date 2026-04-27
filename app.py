@@ -9,6 +9,7 @@ from gtts import gTTS
 import subprocess
 import imageio_ffmpeg
 import google.generativeai as genai
+from google.generativeai.types import HarmCategory, HarmBlockThreshold # 🌟 新增這行
 
 app = Flask(__name__)
 
@@ -17,6 +18,13 @@ FAL_API_KEY = os.environ.get("FAL_API_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 genai.configure(api_key=GEMINI_API_KEY)
+# 🌟 新增：將所有安全過濾器調到最低 (允許影視術語)
+SAFETY_SETTINGS = {
+    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+}
 LORA_URL = "https://v3b.fal.media/files/b/0a97b6f3/HhMceWpJdTP7Fkz6_LHLk_pytorch_lora_weights.safetensors"
 # 修正：移除行末隱藏字元
 GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzxxDJqDigH-9NK8XUUeOiX0NDkBRGaGIc4Z_m-2Q5bzPZT2aEh0zvI-MIkSQoUf90y/exec" 
