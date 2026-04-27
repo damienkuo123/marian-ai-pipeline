@@ -9,24 +9,25 @@ from gtts import gTTS
 import subprocess
 import imageio_ffmpeg
 import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmBlockThreshold # 🌟 新增這行
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 app = Flask(__name__)
 
-# ✅ 正確的防彈寫法：向環境變數索取金鑰
+# 向環境變數索取金鑰
 FAL_API_KEY = os.environ.get("FAL_API_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 genai.configure(api_key=GEMINI_API_KEY)
-# 🌟 新增：將所有安全過濾器調到最低 (允許影視術語)
+
+# 🌟 全局解鎖：將所有安全過濾器調到最低 (允許影視術語如 shoot, shot 等)
 SAFETY_SETTINGS = {
     HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
     HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
     HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
     HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
 }
+
 LORA_URL = "https://v3b.fal.media/files/b/0a97b6f3/HhMceWpJdTP7Fkz6_LHLk_pytorch_lora_weights.safetensors"
-# 修正：移除行末隱藏字元
 GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzxxDJqDigH-9NK8XUUeOiX0NDkBRGaGIc4Z_m-2Q5bzPZT2aEh0zvI-MIkSQoUf90y/exec" 
 
 PENDING_SCENES = {}
@@ -67,10 +68,9 @@ def write_script():
     """
     
     try:
-        model = genai.GenerativeModel('gemini-3.1-pro-preview')
-        response = model.generate_content(prompt_text, safety_settings=SAFETY_SETTINGS)
+        model = genai.GenerativeModel('gemini-3.1-pro-preview', safety_settings=SAFETY_SETTINGS)
+        response = model.generate_content(prompt_text)
         
-        # 強化版 JSON 清理邏輯
         result_text = response.text.strip()
         if result_text.startswith("```"):
             result_text = result_text.split("\n", 1)[-1]
@@ -198,11 +198,11 @@ def brainstorm():
     history = data.get('history', [])
     
     try:
-        model = genai.GenerativeModel('gemini-3.1-pro-preview')
+        model = genai.GenerativeModel('gemini-3.1-pro-preview', safety_settings=SAFETY_SETTINGS)
         if not history:
             user_message = f"[系統指令：你是瑪麗安動畫工作室的首席編劇。請以專業、有創意的態度與導演討論營隊動畫劇本。協助發想章節大綱，語氣保持專業與簡潔。]\n\n導演說：{user_message}"
 
-        chat = model.start_chat(history=history, safety_settings=SAFETY_SETTINGS)
+        chat = model.start_chat(history=history)
         response = chat.send_message(user_message)
         updated_history = [{"role": msg.role, "parts": [msg.parts[0].text]} for msg in chat.history]
         return jsonify({"status": "success", "reply": response.text, "history": updated_history})
@@ -237,10 +237,9 @@ def analyze_assets():
     """
     
     try:
-        model = genai.GenerativeModel('gemini-3.1-pro-preview')
-        response = model.generate_content(prompt_text, safety_settings=SAFETY_SETTINGS)
+        model = genai.GenerativeModel('gemini-3.1-pro-preview', safety_settings=SAFETY_SETTINGS)
+        response = model.generate_content(prompt_text)
         
-        # 修正：補齊 JSON 清理邏輯，避免解析失敗
         result_text = response.text.strip()
         if result_text.startswith("```"):
             result_text = result_text.split("\n", 1)[-1]
