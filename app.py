@@ -96,17 +96,31 @@ def write_script():
 def process_images_background(scene_data):
     try:
         scene_id = scene_data['scene_id']
-        print(f"🚀 [上半場] 啟動：為場景 {scene_id} 生成 4 張候選圖...")
-        PENDING_SCENES[scene_id] = scene_data
-        headers = {"Authorization": f"Key {FAL_API_KEY}", "Content-Type": "application/json"}
+        prompt = scene_data['prompt']
+        
+        # 🌟 核心升級：偵測 Prompt 裡是否有參考圖片網址
+        # 我們假設如果 Prompt 包含特定的圖片標籤，就啟動強大的 Image-to-Image
+        image_url_reference = scene_data.get('ref_image_url') 
 
+        headers = {"Authorization": f"Key {FAL_API_KEY}", "Content-Type": "application/json"}
+        
+        # 如果有參考圖，我們改用 fal-ai/flux/dev/image-to-image 或類似節點
+        # 這裡示範如何將參考圖作為強大的強度引導
         img_payload = {
-            "prompt": scene_data['prompt'], 
-            "image_size": "landscape_16_9", 
-            "num_images": 4, 
+            "prompt": prompt,
+            "image_size": "landscape_16_9",
+            "num_images": 4,
             "loras": [{"path": LORA_URL, "scale": 1.0}]
         }
-        img_resp = requests.post("https://fal.run/fal-ai/flux-lora", json=img_payload, headers=headers)
+        
+        if image_url_reference:
+            img_payload["image_url"] = image_url_reference
+            img_payload["strength"] = 0.65 # 🌟 關鍵：0.65 代表保留 65% 的原始構圖與背景，其餘由 AI 發揮
+            target_api = "https://fal.run/fal-ai/flux/dev/image-to-image"
+        else:
+            target_api = "https://fal.run/fal-ai/flux-lora"
+
+        img_resp = requests.post(target_api, json=img_payload, headers=headers)
         if img_resp.status_code != 200: raise Exception(img_resp.text)
             
         img_urls = [img['url'] for img in img_resp.json()['images']]
