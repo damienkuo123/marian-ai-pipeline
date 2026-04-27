@@ -60,24 +60,22 @@ def write_script():
     """
     
     try:
-        print(f"🧠 正在呼叫 Gemini 拆解分鏡：{title}")
         model = genai.GenerativeModel('gemini-3.1-pro-preview')
         response = model.generate_content(prompt_text)
         
-        # 清理可能夾帶的 Markdown 語法 (```json ... ```)
+        # 完整清理 JSON 格式 (避免 Markdown 標籤干擾)
         result_text = response.text.strip()
         if result_text.startswith("```json"):
             result_text = result_text[7:]
+        if result_text.startswith("```"):
+            result_text = result_text[3:]
         if result_text.endswith("```"):
             result_text = result_text[:-3]
             
-        script_json = json.loads(result_text.strip())
-        print(f"✅ Gemini 拆解完成，共 {len(script_json)} 個鏡頭。")
-        
-        return jsonify({"status": "success", "data": script_json})
-        
+        analysis_data = json.loads(result_text.strip())
+        return jsonify({"status": "success", "analysis": analysis_data})
     except Exception as e:
-        print(f"❌ Gemini 編劇失敗：{e}")
+        print(f"❌ 資產分析失敗：{e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
