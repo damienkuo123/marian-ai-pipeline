@@ -9,7 +9,6 @@ from gtts import gTTS
 import subprocess
 import imageio_ffmpeg
 import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 app = Flask(__name__)
 
@@ -19,13 +18,13 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 genai.configure(api_key=GEMINI_API_KEY)
 
-# 🌟 全局解鎖：將所有安全過濾器調到最低 (允許影視術語如 shoot, shot 等)
-SAFETY_SETTINGS = {
-    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-}
+# 🌟 升級版安全設定 (使用底層陣列格式，強制解鎖)
+SAFETY_SETTINGS = [
+    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
+]
 
 LORA_URL = "https://v3b.fal.media/files/b/0a97b6f3/HhMceWpJdTP7Fkz6_LHLk_pytorch_lora_weights.safetensors"
 GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzxxDJqDigH-9NK8XUUeOiX0NDkBRGaGIc4Z_m-2Q5bzPZT2aEh0zvI-MIkSQoUf90y/exec" 
@@ -46,9 +45,10 @@ def write_script():
     char_info = "\n".join([f"角色 [{c['Name']}]: {c['Prompt']}" for c in chars])
     loc_info = "\n".join([f"場景 [{l['Name']}]: {l['Prompt']}" for l in locs])
 
+    # 🌟 術語去武器化：將 Shot 改為 cinematic clips
     prompt_text = f"""
     You are an expert 3D animation director and storyboard artist.
-    Please break down the following Sequence Outline into 3 to 5 cinematic Shots.
+    Please break down the following Sequence Outline into 3 to 5 cinematic clips (camera angles).
     
     【Project Info】
     Sequence Title: {title}
@@ -71,6 +71,10 @@ def write_script():
         model = genai.GenerativeModel('gemini-3.1-pro-preview', safety_settings=SAFETY_SETTINGS)
         response = model.generate_content(prompt_text)
         
+        # 🌟 防崩潰機制
+        if not response.candidates or not response.parts:
+            raise Exception("劇本中可能包含『過度暴力、危險或敏感』的詞彙，觸發了 Google 底層保護，請主任稍微修改大綱文字。")
+            
         result_text = response.text.strip()
         if result_text.startswith("```"):
             result_text = result_text.split("\n", 1)[-1]
@@ -220,6 +224,7 @@ def analyze_assets():
     available_chars = data.get('chars', [])
     available_locs = data.get('locs', [])
 
+    # 🌟 術語去武器化：將 estimated_shots 改為 estimated_clips
     prompt_text = f"""
     You are a production manager. Analyze this chapter outline and match it with the available assets.
     Outline: {outline}
@@ -231,7 +236,7 @@ def analyze_assets():
     {{
       "identified_chars": ["Name1", "Name2"],
       "identified_loc": "LocationName",
-      "estimated_shots": 5,
+      "estimated_clips": 5,
       "production_notes": "A brief advice for the director"
     }}
     """
@@ -240,13 +245,22 @@ def analyze_assets():
         model = genai.GenerativeModel('gemini-3.1-pro-preview', safety_settings=SAFETY_SETTINGS)
         response = model.generate_content(prompt_text)
         
+        # 🌟 防崩潰機制
+        if not response.candidates or not response.parts:
+            raise Exception("劇本中可能包含『過度暴力、危險或敏感』的詞彙，觸發了 Google 底層保護，請稍微修改大綱文字。")
+            
         result_text = response.text.strip()
         if result_text.startswith("```"):
             result_text = result_text.split("\n", 1)[-1]
         if result_text.endswith("```"):
             result_text = result_text.rsplit("\n", 1)[0]
             
-        return jsonify({"status": "success", "analysis": json.loads(result_text.strip())})
+        # 修正回傳欄位對應前端
+        analysis = json.loads(result_text.strip())
+        if 'estimated_clips' in analysis:
+            analysis['estimated_shots'] = analysis.pop('estimated_clips')
+
+        return jsonify({"status": "success", "analysis": analysis})
     except Exception as e:
         print(f"❌ 資產分析失敗：{e}")
         return jsonify({"status": "error", "message": str(e)}), 500
