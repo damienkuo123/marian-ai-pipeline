@@ -191,5 +191,33 @@ def list_available_models():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
 
+# ==========================================
+# ✍️ 全新模組：互動式編劇室 (聊天對話)
+# ==========================================
+@app.route('/api/brainstorm', methods=['POST'])
+def brainstorm():
+    data = request.json
+    user_message = data.get('message', '')
+    history = data.get('history', []) # 接收過去的對話紀錄
+    
+    try:
+        model = genai.GenerativeModel('gemini-3.1-pro-preview')
+        
+        # 💡 如果是第一句話，我們偷偷塞入「首席編劇」的系統指令
+        if not history:
+            user_message = f"[系統指令：你是瑪麗安動畫工作室的首席編劇。請以專業、有創意的態度與導演討論營隊動畫劇本。協助發想章節大綱，語氣保持專業與簡潔。]\n\n導演說：{user_message}"
+
+        # 啟動具有記憶的聊天室
+        chat = model.start_chat(history=history)
+        response = chat.send_message(user_message)
+        
+        # 整理最新歷史紀錄回傳給網頁
+        updated_history = [{"role": msg.role, "parts": [msg.parts[0].text]} for msg in chat.history]
+            
+        return jsonify({"status": "success", "reply": response.text, "history": updated_history})
+    except Exception as e:
+        print(f"❌ 編劇室發生錯誤：{e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
