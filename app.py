@@ -219,5 +219,40 @@ def brainstorm():
         print(f"❌ 編劇室發生錯誤：{e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+# ==========================================
+# 🔍 全新模組：資產分析與盤點 (Asset Analysis)
+# ==========================================
+@app.route('/api/analyze-assets', methods=['POST'])
+def analyze_assets():
+    data = request.json
+    outline = data.get('outline', '')
+    available_chars = data.get('chars', [])
+    available_locs = data.get('locs', [])
+
+    # 讓 Gemini 擔任場記，盤點需要哪些資產
+    prompt_text = f"""
+    You are a production manager. Analyze this chapter outline and match it with the available assets.
+    Outline: {outline}
+    
+    Characters in library: {available_chars}
+    Locations in library: {available_locs}
+    
+    Output JSON:
+    {{
+      "identified_chars": ["Name1", "Name2"],
+      "identified_loc": "LocationName",
+      "estimated_shots": 5,
+      "production_notes": "A brief advice for the director"
+    }}
+    """
+    
+    try:
+        model = genai.GenerativeModel('gemini-3.1-pro-preview')
+        response = model.generate_content(prompt_text)
+        # 清理並讀取 JSON (省略清理邏輯...)
+        return jsonify({"status": "success", "analysis": json.loads(response.text)})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+        
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
